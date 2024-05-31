@@ -141,4 +141,89 @@ router.post("/execute-report", async (req, res) => {
   }
 });
 
+// Schedule reports endpoint
+router.post("/schedule-reports", async (req, res) => {
+  const { orgId, reportIds } = req.body;
+
+  try {
+    const organization = await Organization.findById(orgId);
+    if (!organization) {
+      return res.status(404).json({ message: "Organization not found" });
+    }
+
+    // Add scheduled reports to the organization
+    organization.scheduledReports = reportIds.map((id) => ({
+      report: id,
+      time: "00 00 00 * * *",
+    })); // Run daily at midnight
+    await organization.save();
+
+    // Schedule the jobs
+    reportIds.forEach((reportId) => {
+      scheduleReportJob(orgId, reportId);
+    });
+
+    res.status(200).json({ message: "Reports scheduled successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+});
+
+// Function to schedule report job
+const scheduleReportJob = (orgId, reportId) => {
+  nodeCron.schedule("00 00 00 * * *", async () => {
+    try {
+      const organization = await Organization.findById(orgId).populate(
+        "reports"
+      );
+      const report = organization.reports.id(reportId);
+
+      const users = await User.find({ organization: orgId });
+      const emails = users.map((user) => user.email);
+
+      // Create the report file (e.g., CSV or PDF) based on report query
+      const reportFile = await generateReportFile(report);
+
+      // Send emails to all users
+      await sendEmails(emails, reportFile, report.name);
+    } catch (error) {
+      console.error("Error in scheduled job:", error);
+    }
+  });
+};
+
+// Function to generate report file based on the report query
+const generateReportFile = async (report) => {
+  // Implement report file generation logic here
+  // This can be a CSV or PDF based on your implementation
+  // For demonstration purposes, returning a dummy buffer
+  return Buffer.from(`Report: ${report.name}\nQuery: ${report.query}`, "utf-8");
+};
+
+// Function to send emails
+const sendEmails = async (emails, file, reportName) => {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: emails.join(", "), // Join emails into a single string
+    subject: `Scheduled Report: ${reportName}`,
+    text: "Please find the attached report.",
+    attachments: [
+      {
+        filename: `${reportName}.pdf`, // or .csv based on file type
+        content: file,
+      },
+    ],
+  };
+
+  await transporter.sendMail(mailOptions);
+};
+
 export default router;
