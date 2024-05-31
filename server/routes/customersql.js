@@ -1,6 +1,9 @@
 import express from "express";
+import fetchDataFromCustomerTable from "../controllers/customerController.js";
+import fetchDataFromCompaniesTable from "../controllers/comapnyController.js";
 import multer from "multer";
 import nodemailer from "nodemailer";
+// import puppeteer from "puppeteer";
 import Organization from "../models/Organization.js";
 import User from "../models/User.js";
 import connectAndQuery from "../configuration/db.js";
@@ -9,6 +12,89 @@ import streamBuffers from "stream-buffers";
 
 const router = express.Router();
 const upload = multer(); // Define the upload variable here
+
+// Route to fetch customer data
+const getCustomerDataHandler = async (req, res) => {
+  try {
+    const data = await fetchDataFromCustomerTable();
+    console.log("Fetched customer data:", data);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error("Error fetching customer data:", err);
+    res.status(500).json({ success: false, msg: "Internal server error" });
+  }
+};
+
+// Route to fetch companies data
+const getCompaniesDataHandler = async (req, res) => {
+  try {
+    const data = await fetchDataFromCompaniesTable();
+    console.log("Fetched companies data:", data);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error("Error fetching companies data:", err);
+    res.status(500).json({ success: false, msg: "Internal server error" });
+  }
+};
+
+// router.post("/send-report", upload.single("file"), async (req, res) => {
+//   const { email } = req.body;
+//   const file = req.file;
+
+//   if (!email || !file) {
+//     return res.status(400).send("Email and file are required");
+//   }
+
+//   // Determine the file extension
+//   const fileExtension = file.originalname.split(".").pop();
+
+//   // Create a Nodemailer transporter using your email service
+//   const transporter = nodemailer.createTransport({
+//     service: "gmail", // e.g., 'gmail'
+//     auth: {
+//       user: process.env.EMAIL_USER,
+//       pass: process.env.EMAIL_PASSWORD,
+//     },
+//     secure: true, // true for 465, false for other ports
+//   });
+
+//   // Verify the connection configuration
+//   transporter.verify(function (error, success) {
+//     if (error) {
+//       console.log(error);
+//       res
+//         .status(500)
+//         .send("Error verifying email configuration: " + error.message);
+//     } else {
+//       console.log("Server is ready to take our messages");
+
+//       // Email options
+//       const mailOptions = {
+//         from: process.env.EMAIL_USER,
+//         to: email,
+//         subject: "Report",
+//         text: "Please find attached report.",
+//         attachments: [
+//           {
+//             filename: `report.${fileExtension}`, // Dynamic filename based on file extension
+//             content: file.buffer,
+//           },
+//         ],
+//       };
+
+//       // Send email
+//       transporter.sendMail(mailOptions, (err, info) => {
+//         if (err) {
+//           console.error("Error sending email:", err);
+//           res.status(500).send("Error sending email: " + err.message);
+//         } else {
+//           console.log("Email sent successfully:", info.response);
+//           res.status(200).send("Email sent successfully");
+//         }
+//       });
+//     }
+//   });
+// });
 
 router.post("/send-report", upload.single("file"), async (req, res) => {
   const { email } = req.body;
@@ -115,7 +201,7 @@ router.post("/add-report", async (req, res) => {
 });
 
 // Fetch reports by organization
-router.post("/get-reports", async (req, res) => {
+router.get("/get-reports", async (req, res) => {
   const { orgId } = req.body;
 
   try {
@@ -126,6 +212,24 @@ router.post("/get-reports", async (req, res) => {
 
     res.status(200).json(organization.reports);
   } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+});
+
+router.post("/organization-reports", async (req, res) => {
+  const { organizationId } = req.body;
+  try {
+    const organization = await Organization.findById(organizationId).populate(
+      "reports"
+    );
+
+    if (!organization) {
+      return res.status(404).json({ message: "Organization not found" });
+    }
+
+    res.status(200).json(organization.reports);
+  } catch (error) {
+    console.error("Server error:", error);
     res.status(500).json({ message: "Server error", error });
   }
 });
@@ -141,89 +245,7 @@ router.post("/execute-report", async (req, res) => {
   }
 });
 
-// Schedule reports endpoint
-router.post("/schedule-reports", async (req, res) => {
-  const { orgId, reportIds } = req.body;
-
-  try {
-    const organization = await Organization.findById(orgId);
-    if (!organization) {
-      return res.status(404).json({ message: "Organization not found" });
-    }
-
-    // Add scheduled reports to the organization
-    organization.scheduledReports = reportIds.map((id) => ({
-      report: id,
-      time: "00 00 00 * * *",
-    })); // Run daily at midnight
-    await organization.save();
-
-    // Schedule the jobs
-    reportIds.forEach((reportId) => {
-      scheduleReportJob(orgId, reportId);
-    });
-
-    res.status(200).json({ message: "Reports scheduled successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error });
-  }
-});
-
-// Function to schedule report job
-const scheduleReportJob = (orgId, reportId) => {
-  nodeCron.schedule("00 00 00 * * *", async () => {
-    try {
-      const organization = await Organization.findById(orgId).populate(
-        "reports"
-      );
-      const report = organization.reports.id(reportId);
-
-      const users = await User.find({ organization: orgId });
-      const emails = users.map((user) => user.email);
-
-      // Create the report file (e.g., CSV or PDF) based on report query
-      const reportFile = await generateReportFile(report);
-
-      // Send emails to all users
-      await sendEmails(emails, reportFile, report.name);
-    } catch (error) {
-      console.error("Error in scheduled job:", error);
-    }
-  });
-};
-
-// Function to generate report file based on the report query
-const generateReportFile = async (report) => {
-  // Implement report file generation logic here
-  // This can be a CSV or PDF based on your implementation
-  // For demonstration purposes, returning a dummy buffer
-  return Buffer.from(`Report: ${report.name}\nQuery: ${report.query}`, "utf-8");
-};
-
-// Function to send emails
-const sendEmails = async (emails, file, reportName) => {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD,
-    },
-  });
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: emails.join(", "), // Join emails into a single string
-    subject: `Scheduled Report: ${reportName}`,
-    text: "Please find the attached report.",
-    attachments: [
-      {
-        filename: `${reportName}.pdf`, // or .csv based on file type
-        content: file,
-      },
-    ],
-  };
-
-  await transporter.sendMail(mailOptions);
-};
+router.get("/customerData", getCustomerDataHandler);
+router.get("/companiesData", getCompaniesDataHandler);
 
 export default router;

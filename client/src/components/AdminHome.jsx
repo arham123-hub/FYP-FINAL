@@ -20,7 +20,6 @@ import OrganizationList from './GetListOfOrgs';
 import ModifyOrganizationForm from './ModifyOrgForm';
 import AddNewCustomerForm from './AddNewCustomerForm';
 import AdminList from './TableDisplayAdmins';
-import ScheduleReports from './ScheduleReports';
 
 
 import CreateAndAssignReport from './CreateAndAssignReport';
@@ -55,7 +54,6 @@ const AdminHome = () => {
   const [openSubMenu4, setOpenSubMenu4] = React.useState(false);
   const [openSubMenu5, setOpenSubMenu5] = React.useState(false);
   const [openSubMenu6, setOpenSubMenu6] = React.useState(false);
-  const [openSubMenu7, setOpenSubMenu7] = React.useState(false);
  
 
 
@@ -85,10 +83,6 @@ const AdminHome = () => {
 
   const handleSubMenu6Click = () => {
     setOpenSubMenu6(!openSubMenu6);
-  };
-
-  const handleSubMenu7Click = () => {
-    setOpenSubMenu7(!openSubMenu7);
   };
 
   const handleLogout = () => {
@@ -325,23 +319,6 @@ const AdminHome = () => {
                 
               </List>
             </Collapse>
-            <ListItem button onClick={handleSubMenu7Click}>
-              <ListItemIcon>
-                {openSubMenu7 ? <ArrowDropDownIcon /> : <ArrowRightIcon />}
-              </ListItemIcon>
-              <ListItemText primary="Schedling" />
-            </ListItem>
-            <Collapse in={openSubMenu7} timeout="auto" unmountOnExit>
-              <List component="div" disablePadding>
-                <ListItem button onClick={() => handleOptionClick('ScheduleReport')} sx={{ pl: 4 }}>
-                  <ListItemIcon>
-                    <ArrowRightIcon />
-                  </ListItemIcon>
-                  <ListItemText primary="Schedule Reports" />
-                </ListItem>
-                
-              </List>
-            </Collapse>
           </List>
         </div>
 
@@ -361,7 +338,6 @@ const AdminHome = () => {
           {selectedOption === 'modifyExistingCustomer' && <ModifyAdminForm />}
           {selectedOption === 'adminsTable' && <AdminList />}
           {/* {selectedOption === '' && <AdminList />} */}
-          {selectedOption === 'ScheduleReport' && <ScheduleReports />}
 
         </Paper>
       </div>

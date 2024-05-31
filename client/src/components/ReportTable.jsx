@@ -635,20 +635,3 @@ const ReportTable = ({ data, reportName }) => {
 };
 
 export default ReportTable;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
